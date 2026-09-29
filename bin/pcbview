@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# pcbview -- run the package from this checkout, from anywhere:
+#     ~/Software/pcbview/bin/pcbview build pcbview.toml
+here="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")/.." && pwd)"
+PYTHONPATH="$here${PYTHONPATH:+:$PYTHONPATH}" exec python3 -m pcbview "$@"

@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>pcbview</title>
+<style>
+/* Same palette as the hub dashboard, so a project page and the project list
+   read as one system when you tab between them. */
+:root {
+  --bg: #f6f7f9; --card: #ffffff; --line: #e2e5ea; --fg: #14171c;
+  --muted: #5f6875; --accent: #2f6feb; --up: #1a9c5b; --warn: #b7791f;
+  --down: #98a1ae; --chip: #eef1f5;
+  --shadow: 0 1px 2px rgba(16,20,28,.06), 0 4px 12px rgba(16,20,28,.05);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1116; --card: #171b22; --line: #262c36; --fg: #e6e9ee;
+    --muted: #8b94a3; --accent: #5b9bff; --up: #35c07d; --warn: #d9a441;
+    --down: #4d5563; --chip: #222833; --shadow: none;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  padding: 0 0 3rem;
+}
+header, main, footer { max-width: 900px; margin: 0 auto; padding: 0 1.25rem; }
+header { padding-top: 1.75rem; padding-bottom: 1rem; }
+.title { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+h1 { font-size: 1.5rem; margin: 0; letter-spacing: -.015em; }
+h2 {
+  font-size: .78rem; margin: 0 0 .6rem; text-transform: uppercase;
+  letter-spacing: .08em; color: var(--muted); font-weight: 650;
+}
+.state {
+  display: inline-flex; align-items: center; gap: .4rem; border-radius: 999px;
+  padding: .2rem .65rem; font-size: .76rem; font-weight: 600;
+  background: var(--chip); border: 1px solid var(--line); color: var(--muted);
+}
+.state .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--down); }
+.state.active { color: var(--up); border-color: color-mix(in srgb, var(--up) 35%, var(--line)); }
+.state.active .dot { background: var(--up); box-shadow: 0 0 0 3px color-mix(in srgb, var(--up) 22%, transparent); }
+.state.blocked { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 35%, var(--line)); }
+.state.blocked .dot { background: var(--warn); }
+.lede { color: var(--muted); font-size: .95rem; margin: .55rem 0 0; }
+main { display: grid; gap: .9rem; }
+.card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 1rem 1.1rem 1.1rem; box-shadow: var(--shadow);
+}
+.cols { display: grid; gap: .9rem; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
+ul { margin: 0; padding-left: 1.15rem; }
+li { margin: .25rem 0; }
+ul.checks { list-style: none; padding-left: 0; }
+ul.checks li { display: flex; gap: .55rem; align-items: baseline; }
+ul.checks li::before { content: "○"; color: var(--muted); font-size: .9em; }
+ul.checks li.done { color: var(--muted); }
+ul.checks li.done::before { content: "●"; color: var(--up); }
+.log { display: grid; gap: .7rem; }
+.entry { display: grid; grid-template-columns: 5.5rem 1fr; gap: .75rem; align-items: baseline; }
+.entry time { color: var(--muted); font-size: .8rem; font-variant-numeric: tabular-nums; }
+.todo { color: var(--muted); font-style: italic; }
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .9em;
+  background: var(--chip); border: 1px solid var(--line);
+  border-radius: 5px; padding: .06em .35em;
+}
+a { color: var(--accent); }
+footer { margin-top: 1.5rem; color: var(--muted); font-size: .8rem; }
+@media (max-width: 480px) { .entry { grid-template-columns: 1fr; gap: .1rem; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title">
+    <h1>pcbview</h1>
+    <span class="state active"><span class="dot"></span>Working &mdash; first version</span>
+  </div>
+  <p class="lede">KiCad boards on the web: a schematic / PCB / 3D viewer after Altium 365&rsquo;s,
+  generated from the board files by KiCad&rsquo;s own exporters. Pulled out of servodrive&rsquo;s project
+  pages so any board here can have one.</p>
+</header>
+
+<main>
+
+  <section class="card">
+    <h2>Where it stands</h2>
+    <p>One command, <code>python3 -m pcbview build pcbview.toml</code>, turns a KiCad project into a static
+    site: every schematic sheet as <code>kicad-cli</code> plots it, every copper layer plotted in KiCad&rsquo;s
+    own coordinates and stacked in register (with silkscreen and fab overlays), and the assembled board as a
+    GLB cut from ~30&nbsp;MB to ~8. Click a part on the PCB or in 3D for its value, LCSC number, footprint,
+    position and the net on every pin. A board can be read straight out of git at a tag, so a page can pin
+    the design that was fabricated. Applied first to <b>rp2350-motor-controller rev A</b>
+    (<code>pcbview.toml</code> at that repo&rsquo;s root, served as <code>review/viewer/</code>:
+    <code>proj url rp2350-motor-controller</code> + <code>viewer/</code>).</p>
+    <p>Examples served here: <a href="demo/kicad/">three of KiCad&rsquo;s demo projects</a> (hierarchical
+    sheets, a sheet used twice, an 8-layer board) and <a href="demo/servodrive/">servodrive&rsquo;s board S</a>,
+    the board the viewer was written for, rebuilt through pcbview as a parity check.</p>
+  </section>
+
+  <div class="cols">
+    <section class="card">
+      <h2>Working</h2>
+      <ul class="checks">
+        <li class="done">Project registered on port 8037</li>
+        <li class="done">SCH tab: hierarchy walked from the files, one plot per sheet instance, PDF</li>
+        <li class="done">PCB tab: any outline (pcbnew&rsquo;s own polygon), pcbnew coordinates, r/&theta; on round boards</li>
+        <li class="done">3D tab: model paths resolved (KiCad 6&ndash;8 variables, VRML&rarr;STEP, project folder), stand-ins from config</li>
+        <li class="done">Nested STEP assemblies flattened automatically; unmodelled parts drawn as courtyard boxes</li>
+        <li class="done">Part pane shared by PCB and 3D, selection kept across tabs</li>
+        <li class="done"><code>git = "tag"</code> boards; <code>quick</code> mode with no config</li>
+        <li class="done">rp2350-motor-controller rev A: 259 of 291 parts modelled, 8 boxed</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Next up</h2>
+      <ul class="checks">
+        <li>Move servodrive&rsquo;s own pages onto pcbview (its tools/plot_layers.py and export_3d.py are the originals)</li>
+        <li>Cross-probe the schematic: click a symbol, find the part</li>
+        <li>Net highlight on the PCB tab</li>
+        <li>Board diff: two refs of the same board, layer by layer</li>
+      </ul>
+    </section>
+  </div>
+
+  <div class="cols">
+    <section class="card">
+      <h2>Open questions</h2>
+      <ul>
+        <li>Whether the built sites (~20&nbsp;MB a board) get committed to each project or regenerated.</li>
+        <li>Stand-in models are per project (<code>[models]</code>); a shared library of them would save
+        re-deriving the same rotations.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Blocked on</h2>
+      <ul>
+        <li>Nothing.</li>
+      </ul>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Log</h2>
+    <div class="log">
+      <div class="entry">
+        <time datetime="2026-09-27">2026-09-27</time>
+        <div>Created from servodrive&rsquo;s board viewer (shell.js, copper.js, sch.js, board3d.js,
+        tools/plot_layers.py, tools/export_3d.py, tools/flatten_step.py) and made general: config file,
+        git sources, any outline, KiCad coordinates, model resolver, automatic flattening, stand-in boxes,
+        PCB-tab part picking. Built for rp2350-motor-controller rev A (tag <code>rev-A-fab</code>), three
+        KiCad demos and servodrive board S.</div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  Served from <code>~/Software/pcbview</code> on port 8037 —
+  <code>proj up pcbview</code> to start, <code>proj down pcbview</code> to stop.
+</footer>
+
+</body>
+</html>

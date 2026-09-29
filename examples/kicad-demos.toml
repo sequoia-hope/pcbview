@@ -1,0 +1,33 @@
+# KiCad's own demo projects, three boards on one site: a test that pcbview is
+# not shaped round the boards it was written for (hierarchical sheets, a sheet
+# used twice, project-local 3D models, different stackups and outlines).
+#
+#     python3 -m pcbview build examples/kicad-demos.toml   ->  demo/kicad/
+#
+# Served with the project: http://localhost:$(proj port pcbview)/demo/kicad/
+
+title = "KiCad demos"
+subtitle = "pcbview examples"
+out = "../demo/kicad"
+back = { href = "../../index.html", label = "pcbview" }
+
+[[boards]]
+id = "stickhub"
+name = "StickHub"
+pcb = "/usr/share/kicad/demos/stickhub/StickHub.kicad_pcb"
+sch = "/usr/share/kicad/demos/stickhub/StickHub.kicad_sch"
+note = "KiCad's StickHub demo: a four-port USB hub on a stick, with its 3D models in the project's own folder."
+
+[[boards]]
+id = "feather"
+name = "RoyalBlue54L Feather"
+pcb = "/usr/share/kicad/demos/royalblue54L_feather/RoyalBlue54L-Feather.kicad_pcb"
+sch = "/usr/share/kicad/demos/royalblue54L_feather/RoyalBlue54L-Feather.kicad_sch"
+note = "KiCad's RoyalBlue54L Feather demo: hierarchical sheets in a subdirectory."
+
+[[boards]]
+id = "complex"
+name = "Complex hierarchy"
+pcb = "/usr/share/kicad/demos/complex_hierarchy/complex_hierarchy.kicad_pcb"
+sch = "/usr/share/kicad/demos/complex_hierarchy/complex_hierarchy.kicad_sch"
+note = "KiCad's complex_hierarchy demo: one sheet file used twice."
