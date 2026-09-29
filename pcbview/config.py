@@ -30,6 +30,8 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .util import shown
+
 # the files a board's directory may need besides the board and its sheets:
 # the project (text variables, rules), a drawing sheet, the design rules
 BESIDE = (".kicad_pro", ".kicad_wks", ".kicad_dru")
@@ -49,6 +51,8 @@ class Board:
     front_note: str = ""         # e.g. "the outward face"
     back_note: str = ""
     polar: bool | None = None    # radius/angle readout; None = only if round
+    embed: Path | None = None    # a page of the project's own to write the viewer into
+    sheets: dict = field(default_factory=dict)       # sheet path -> {title, desc}
 
 
 @dataclass
@@ -129,11 +133,12 @@ def load(path):
         if "git" in b:
             repo = p(b.get("repo", "."))
             pcb, sch, src, top = from_git(repo, b["git"], b["pcb"], b.get("sch"))
+            src["repo"] = shown(top, base) if top != base else "."
             project = (top / b["pcb"]).parent
         else:
             pcb, sch = p(b["pcb"]), p(b.get("sch"))
             project = pcb.parent
-            src = {"kind": "file", "pcb": str(pcb), "sch": str(sch) if sch else None}
+            src = {"kind": "file", "pcb": shown(pcb, base), "sch": shown(sch, base) if sch else None}
         if not pcb.exists():
             sys.exit(f"board {bid}: no board file at {pcb}")
         if sch and not sch.exists():
@@ -144,7 +149,7 @@ def load(path):
             source=src, note=b.get("note", ""),
             front=b.get("front", "Front"), back=b.get("back", "Back"),
             front_note=b.get("front_note", ""), back_note=b.get("back_note", ""),
-            polar=b.get("polar")))
+            polar=b.get("polar"), embed=p(b.get("embed")), sheets=b.get("sheets", {})))
     if not boards:
         sys.exit(f"{path}: no [[boards]]")
     if len({b.id for b in boards}) != len(boards):
@@ -180,6 +185,7 @@ def quick(pcb, sch=None, out=None, title=None):
     sch = Path(sch).resolve() if sch else None
     board = Board(id=pcb.stem, name=title or pcb.stem, pcb=pcb, sch=sch,
                   project_dir=pcb.parent,
-                  source={"kind": "file", "pcb": str(pcb), "sch": str(sch) if sch else None})
+                  source={"kind": "file", "pcb": shown(pcb, Path.cwd()),
+                          "sch": shown(sch, Path.cwd()) if sch else None})
     return Site(base=Path.cwd(), title=title or pcb.stem,
                 out=Path(out or (pcb.parent / "pcbview-site")).resolve(), boards=[board])

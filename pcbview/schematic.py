@@ -115,11 +115,14 @@ def run(site, board, out):
         h = re.search(r'height="([\d.]+)mm"', text)
         (dest / name).write_text(shrink(text))
         title, comment, count, paper = describe(f)
+        path = "/".join(names) or "root"
         label = names[-1] if names else (title or root.stem)
         desc = comment or (title if names and title and title != label else "")
+        mine = board.sheets.get(path, {})          # the config's words, where it has some
+        label, desc = mine.get("title", label), mine.get("desc", desc)
         desc = (desc + " · " if desc else "") + f"{count} symbols"
-        sheets.append({"sheet": "/".join(names) or "root", "title": label, "desc": desc,
-                       "file": name, "source": f.name, "paper": paper, "page": page,
+        sheets.append({"sheet": path, "title": label, "desc": desc,
+                       "file": name, "source": f.name, "paper": paper, "page": page, "symbols": count,
                        "size_mm": [float(w.group(1)), float(h.group(1))] if w and h else None})
     for name in sorted(set(plotted) - used):          # anything the walk did not name
         (dest / name).write_text(shrink(plotted[name].read_text()))

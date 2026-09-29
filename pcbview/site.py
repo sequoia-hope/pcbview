@@ -11,13 +11,20 @@
 The page is static HTML with everything the build knows written into it --
 the project tree, the tabs, the board's facts -- and the scripts only make it
 move: tabs, pan and zoom, layers, the part pane.
+
+A board with `embed = "page.html"` also has its viewer written into that page,
+a page of the project's own, between <!-- pcbview:begin --> and
+<!-- pcbview:end -->: the same panels, with viewer.css and the scripts, and
+the data read from this site. Everything else on that page is left alone.
 """
 import json
+import os
 import shutil
+import sys
 from datetime import date, datetime
 from pathlib import Path
 
-from .util import esc, natural
+from .util import esc, natural, shown
 
 WEB = Path(__file__).resolve().parent.parent / "web"
 
@@ -127,13 +134,13 @@ def source_line(board):
 
 
 # ------------------------------------------------------------------ panels --
-def schematic_panel(board, sheets):
+def schematic_panel(board, sheets, data):
     if not board.sch:
         return ""
     n = len(sheets or [])
     keys = f"<b>1</b>&ndash;<b>{min(n, 9)}</b> pick a sheet, " if n > 1 else ""
     return f"""
-  <div class="vw-panel" id="schematic" data-dir="{board.id}/sch/" role="tabpanel" hidden>
+  <div class="vw-panel" id="schematic" data-dir="{data}sch/" role="tabpanel" hidden>
     <div class="cu sch">
       <div class="cu-panel">
         <p class="cu-head">Sheets</p>
@@ -159,9 +166,9 @@ def schematic_panel(board, sheets):
   </div>"""
 
 
-def copper_panel(board):
+def copper_panel(board, data):
     return f"""
-  <div class="vw-panel" id="copper" data-dir="{board.id}/layers/" data-parts="{board.id}/3d/parts.json" role="tabpanel">
+  <div class="vw-panel" id="copper" data-dir="{data}layers/" data-parts="{data}3d/parts.json" role="tabpanel">
     <div class="cu">
       <div class="cu-panel">
         <div id="cu-layers"></div>
@@ -208,9 +215,9 @@ def copper_panel(board):
   </div>"""
 
 
-def board3d_panel(board):
+def board3d_panel(board, data):
     return f"""
-  <div class="vw-panel" id="board3d" data-dir="{board.id}/3d/" role="tabpanel" hidden>
+  <div class="vw-panel" id="board3d" data-dir="{data}3d/" role="tabpanel" hidden>
     <div class="b3">
       <div class="b3-bar">
         <div class="cu-row" role="group" aria-label="view">
@@ -323,25 +330,53 @@ def overview_panel(site, board, built):
   </div>"""
 
 
-def board_page(site, board, built, sheets):
+def viewer(site, board, built, sheets, data, embed=False):
+    """The viewer: the tab strip and every panel. `data` is the path from the
+    page to the board's directory in the site."""
     tabs = []
     if board.sch:
         tabs.append('<button role="tab" data-tab="schematic" aria-controls="schematic" aria-selected="false">SCH</button>')
     tabs.append('<button role="tab" data-tab="copper" aria-controls="copper" aria-selected="true">PCB</button>')
     tabs.append('<button role="tab" data-tab="board3d" aria-controls="board3d" aria-selected="false">3D</button>')
+    return f"""<section class="vw"{" data-pv-embed" if embed else ""} aria-label="{esc(board.name)}: schematic, PCB and 3D">
+  <div class="vw-bar">
+    <div class="vw-left"><button data-vw="layers" aria-pressed="true"
+      title="show or hide the side panel">{icon("layers")}<span>Panel</span></button></div>
+    <div class="vw-tabs" role="tablist" aria-label="view">{"".join(tabs)}</div>
+    <div class="vw-tools">
+      <button data-vw="info" title="about this board" aria-label="about this board">{icon("info")}</button>
+      <button data-vw="full" title="full screen" aria-label="full screen">{icon("full")}</button>
+    </div>
+  </div>
+  {schematic_panel(board, sheets.get(board.id), data)}
+  {copper_panel(board, data)}
+  {board3d_panel(board, data)}
+  {overview_panel(site, board, built)}
+</section>"""
+
+
+def scripts(assets):
+    """The viewer's scripts, from `assets` (the path to the site's assets/,
+    with its slash). app.js, where there is one, goes before viewer.js."""
+    return f"""<script src="{assets}parts.js" defer></script>
+<script src="{assets}viewer.js" defer></script>
+<script src="{assets}copper.js" defer></script>
+<script src="{assets}sch.js" defer></script>
+<script type="importmap">{{"imports": {{"three": "./{assets}vendor/three.module.js"}}}}</script>
+<script type="module" src="{assets}board3d.js"></script>"""
+
+
+def board_page(site, board, built, sheets):
     return f"""<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{esc(site.title)} &mdash; {esc(board.name)}</title>
+<link rel="stylesheet" href="assets/viewer.css">
 <link rel="stylesheet" href="assets/pcbview.css">
-<script src="assets/parts.js" defer></script>
 <script src="assets/app.js" defer></script>
-<script src="assets/copper.js" defer></script>
-<script src="assets/sch.js" defer></script>
-<script type="importmap">{{"imports": {{"three": "./assets/vendor/three.module.js"}}}}</script>
-<script type="module" src="assets/board3d.js"></script>
+{scripts("assets/")}
 </head>
 <body>
 {top(site, board)}
@@ -352,25 +387,43 @@ def board_page(site, board, built, sheets):
   <span class="a3-page">{source_line(board)}</span>
 </div>
 <main class="pv-main">
-<section class="vw" aria-label="{esc(board.name)}: schematic, PCB and 3D">
-  <div class="vw-bar">
-    <div class="vw-left"><button data-vw="layers" aria-pressed="true"
-      title="show or hide the side panel">{icon("layers")}<span>Panel</span></button></div>
-    <div class="vw-tabs" role="tablist" aria-label="view">{"".join(tabs)}</div>
-    <div class="vw-tools">
-      <button data-vw="info" title="about this board" aria-label="about this board">{icon("info")}</button>
-      <button data-vw="full" title="full screen" aria-label="full screen">{icon("full")}</button>
-    </div>
-  </div>
-  {schematic_panel(board, sheets.get(board.id))}
-  {copper_panel(board)}
-  {board3d_panel(board)}
-  {overview_panel(site, board, built)}
-</section>
+{viewer(site, board, built, sheets, f"{board.id}/")}
 </main>
 </body>
 </html>
 """
+
+
+# ------------------------------------------------------------------ embeds --
+BEGIN, END = "<!-- pcbview:begin -->", "<!-- pcbview:end -->"
+
+
+def embed_block(site, board, built, sheets, page):
+    """What goes between the markers in `page`: the viewer, its stylesheet and
+    its scripts, every path relative to the page."""
+    to = Path(os.path.relpath(site.out, page.parent)).as_posix()
+    to = "" if to == "." else to + "/"
+    cfg = esc(site.config.name) if site.config else "pcbview"
+    return f"""{BEGIN}
+<!-- written by pcbview (python3 -m pcbview build {cfg}): change the config, not this -->
+<link rel="stylesheet" href="{to}assets/viewer.css">
+{viewer(site, board, built, sheets, f"{to}{board.id}/", embed=True)}
+{scripts(to + "assets/")}
+{END}"""
+
+
+def write_embed(site, board, built, sheets):
+    page = board.embed
+    if not page.exists():
+        sys.exit(f"board {board.id}: embed names {page}, which is not there")
+    text = page.read_text()
+    a, b = text.find(BEGIN), text.find(END)
+    if a < 0 or b < a:
+        sys.exit(f"board {board.id}: {page} has no {BEGIN} ... {END} to write the viewer between")
+    new = text[:a] + embed_block(site, board, built, sheets, page) + text[b + len(END):]
+    if new != text:
+        page.write_text(new)
+    print(f"embedded: {board.id} in {shown(page, site.base)}")
 
 
 def list_page(site, built):
@@ -392,6 +445,7 @@ def list_page(site, built):
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>{esc(site.title)}</title>
+<link rel="stylesheet" href="assets/viewer.css">
 <link rel="stylesheet" href="assets/pcbview.css">
 <script src="assets/app.js" defer></script>
 </head>
@@ -422,10 +476,13 @@ def write(site, built):
     sheets = {b.id: (built[b.id].get("sch") or {}).get("sheets", []) for b in site.boards}
     for b in site.boards:
         (out / page_name(site, b)).write_text(board_page(site, b, built[b.id], sheets))
+        if b.embed:
+            write_embed(site, b, built[b.id], sheets)
     if len(site.boards) > 1:
         (out / "index.html").write_text(list_page(site, built))
     info = {"title": site.title, "built": datetime.now().isoformat(timespec="seconds"),
-            "config": str(site.config) if site.config else None,
+            "config": shown(site.config, site.base) if site.config else None,
             "boards": [{"id": b.id, "name": b.name, "page": page_name(site, b),
+                        "embed": shown(b.embed, site.base) if b.embed else None,
                         "source": b.source} for b in site.boards]}
     (out / "site.json").write_text(json.dumps(info, indent=1) + "\n")

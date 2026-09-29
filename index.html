@@ -96,9 +96,12 @@ footer { margin-top: 1.5rem; color: var(--muted); font-size: .8rem; }
     the design that was fabricated. Applied first to <b>rp2350-motor-controller rev A</b>
     (<code>pcbview.toml</code> at that repo&rsquo;s root, served as <code>review/viewer/</code>:
     <code>proj url rp2350-motor-controller</code> + <code>viewer/</code>).</p>
+    <p><b>servodrive</b>, where the viewer began, now runs on it too: <code>embed</code> writes each
+    board&rsquo;s viewer into that project&rsquo;s own pages (<code>index.html</code> for board A,
+    <code>single.html</code> for board S) between two comment markers, and its own copy of the code is
+    gone. <code>proj url servodrive</code>.</p>
     <p>Examples served here: <a href="demo/kicad/">three of KiCad&rsquo;s demo projects</a> (hierarchical
-    sheets, a sheet used twice, an 8-layer board) and <a href="demo/servodrive/">servodrive&rsquo;s board S</a>,
-    the board the viewer was written for, rebuilt through pcbview as a parity check.</p>
+    sheets, a sheet used twice, an 8-layer board).</p>
   </section>
 
   <div class="cols">
@@ -113,13 +116,14 @@ footer { margin-top: 1.5rem; color: var(--muted); font-size: .8rem; }
         <li class="done">Part pane shared by PCB and 3D, selection kept across tabs</li>
         <li class="done"><code>git = "tag"</code> boards; <code>quick</code> mode with no config</li>
         <li class="done">rp2350-motor-controller rev A: 259 of 291 parts modelled, 8 boxed</li>
+        <li class="done">Embedding in a project&rsquo;s own page (<code>embed</code>): viewer.css and viewer.js on their own, notes per tab</li>
+        <li class="done">servodrive&rsquo;s pages moved onto pcbview; its tools/plot_layers.py, export_3d.py, flatten_step.py and viewer JS deleted</li>
       </ul>
     </section>
 
     <section class="card">
       <h2>Next up</h2>
       <ul class="checks">
-        <li>Move servodrive&rsquo;s own pages onto pcbview (its tools/plot_layers.py and export_3d.py are the originals)</li>
         <li>Cross-probe the schematic: click a symbol, find the part</li>
         <li>Net highlight on the PCB tab</li>
         <li>Board diff: two refs of the same board, layer by layer</li>
@@ -148,6 +152,18 @@ footer { margin-top: 1.5rem; color: var(--muted); font-size: .8rem; }
   <section class="card">
     <h2>Log</h2>
     <div class="log">
+      <div class="entry">
+        <time datetime="2026-09-28">2026-09-28</time>
+        <div>servodrive moved onto pcbview. New: <code>embed = "page.html"</code> on a board writes its
+        viewer into a page of the project&rsquo;s own between <code>&lt;!-- pcbview:begin --&gt;</code> and
+        <code>&lt;!-- pcbview:end --&gt;</code>; <code>data-pv-note="copper"</code> on the page shows the
+        page&rsquo;s own words under a tab. The stylesheet is split (viewer.css, everything inside the viewer
+        and scoped to it; pcbview.css, this app page) and the tab logic moved out of app.js into viewer.js.
+        Per-sheet names in the config (<code>[boards.sheets.&lt;path&gt;]</code>); the SCH tab opens on the
+        first sheet with parts; keys only act while the viewer is on screen; paths print relative to the
+        project, never the machine&rsquo;s home. The servodrive parity example is gone: servodrive builds
+        from its own <code>pcbview.toml</code>, with identical 3D output to its old tools.</div>
+      </div>
       <div class="entry">
         <time datetime="2026-09-27">2026-09-27</time>
         <div>Created from servodrive&rsquo;s board viewer (shell.js, copper.js, sch.js, board3d.js,

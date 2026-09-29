@@ -4,6 +4,7 @@ import re
 import shutil
 import subprocess
 import sys
+from pathlib import Path
 
 NUM = r"-?\d+(?:\.\d+)?"
 
@@ -68,3 +69,16 @@ def rel(path, base):
         return str(path.relative_to(base))
     except ValueError:
         return str(path)
+
+
+def shown(path, base):
+    """A path as a page may print it: relative to the project (`base`) where
+    it is inside it, from ~ where it is under the home directory -- a site is
+    often published, and the machine's own layout is no business of it."""
+    path = Path(path)
+    for root, pre in ((Path(base), ""), (Path.home(), "~/")):
+        try:
+            return pre + path.relative_to(root).as_posix()
+        except ValueError:
+            pass
+    return str(path)

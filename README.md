@@ -28,16 +28,17 @@ turns a KiCad project into a static site (no server code, no build step for the 
 
 It began as servodrive's project-page viewer (`~/pcb/servodrive`: `shell.js`, `copper.js`,
 `sch.js`, `board3d.js`, `tools/plot_layers.py`, `tools/export_3d.py`,
-`tools/flatten_step.py`). Not to be confused with `~/Software/boardvis`, which turns an
-IPC-2581 export into printable assembly drawings.
+`tools/flatten_step.py`), and servodrive's pages now run on it, embedded. Not to be
+confused with `~/Software/boardvis`, which turns an IPC-2581 export into printable
+assembly drawings.
 
 ## Where it is used
 
 | Project | Config | Site |
 |---|---|---|
 | rp2350-motor-controller, rev A as fabricated (tag `rev-A-fab`) | `~/pcb/rp2350-motor-controller/pcbview.toml` | `review/viewer/`, served with the review site |
+| servodrive boards A and S, embedded in the project's own pages | `~/pcb/servodrive/pcbview.toml` | `viewer/`, written into `index.html` and `single.html`; `tools/regen.py` builds it |
 | three KiCad demo projects | `examples/kicad-demos.toml` | `demo/kicad/` |
-| servodrive board S (parity check) | `examples/servodrive.toml` | `demo/servodrive/` |
 
 This project's own page (`proj up pcbview`) is the status page, with the examples under it.
 
@@ -69,6 +70,11 @@ back = "Bottom"                         #   and notes shown under them
 front_note = ""; back_note = ""
 polar = true                            # optional: r/θ readout (default: only if the outline is a circle)
 project_dir = "..."                     # optional: what ${KIPRJMOD} means (default: the board's directory)
+embed = "board.html"                    # optional: also write the viewer into this page (see Embedding)
+
+[boards.sheets.01_power]                # optional: a sheet's name and what is on it, by its path
+title = "Power supply"                  #   (names down the hierarchy joined with /; "root" is the top);
+desc = "the bucks and the bus input"    #   otherwise the sheet's name and its title block's comment
 
 [parts]                                 # optional
 role_field = "servodrive_role"          # a footprint field to show under the value
@@ -95,6 +101,39 @@ directory in the working tree, where the project keeps its models.
 No config at all: `bin/pcbview quick board.kicad_pcb -o site/` (the schematic is the
 `.kicad_sch` of the same name, if there is one).
 
+Paths the pages print (the Overview's source, `site.json`, `built.json`) are relative to
+the config file's directory, or from `~`, never the machine's absolute paths: a site is
+often published.
+
+## Embedding
+
+A project that has pages of its own can have the viewer written into one, instead of (as
+well as) linking to the site's own page. Give the board `embed = "page.html"` and put two
+markers in the page where the viewer goes:
+
+```html
+<!-- pcbview:begin -->
+<!-- pcbview:end -->
+<div class="vw-about" data-pv-note="copper">what the page says about the PCB tab</div>
+```
+
+Every build replaces what is between the markers with the viewer: `assets/viewer.css`,
+the panels (`<section class="vw" data-pv-embed>`), the scripts and the import map, all
+with paths relative to the page, the data read from the site. Nothing else on the page is
+touched, and a page without the markers stops the build. Only one viewer to a page (the
+panels have ids).
+
+Embedded, the viewer keeps to itself: a tab changes nothing but the viewer (no history
+entry), a `#hash` that names a view (`#copper`, `#sch-<sheet>`, ...) opens it and scrolls
+to it, and any other hash is the page's. Keys work only while the viewer is on screen.
+Elements anywhere on the page marked `data-pv-note="<view>"` (schematic, copper, board3d,
+overview) are shown only while that view is open. `window.PV.view(id)` opens a view from
+the page's own script.
+
+`viewer.css` styles only what is inside `section.vw`, and gives its palette at zero
+specificity, so a page that sets `--card`, `--chrome`, `--accent`, `--canvas` and the rest
+on `:root` recolours it. Its height is `--pv-embed-h` (default: the window less 6rem).
+
 ## Commands
 
 ```sh
@@ -111,7 +150,8 @@ bin/pcbview quick board.kicad_pcb -o site/
 ```
 <out>/index.html              the viewer (one board), or the board list (several)
 <out>/<board>.html            each board's viewer, when there are several
-<out>/assets/                 pcbview.css, app.js, parts.js, copper.js, sch.js, board3d.js, three.js
+<out>/assets/                 viewer.css (the viewer), pcbview.css (the app page round it), app.js,
+                              viewer.js, parts.js, copper.js, sch.js, board3d.js, three.js
 <out>/<board>/sch/            <root>[-<sheet>...].svg, <root>.pdf, sheets.json
 <out>/<board>/layers/         f.svg in1.svg ... b.svg, edge.svg, silk_*.svg, fab_*.svg, body.svg, layers.json
 <out>/<board>/3d/             board.glb, board.json (the caption), parts.json (the part pane)
@@ -166,7 +206,8 @@ pcbview/          the Python package
   flatten.py      STEP assembly flattening
   site.py         the pages
   sexp.py         a KiCad s-expression reader (tolerates a stray paren, as KiCad does)
-web/              the front end, copied into every site
+web/              the front end, copied into every site: viewer.js runs the tabs, app.js
+                  the page round them (tree, breadcrumb), parts.js the part pane
 examples/         configs for the example sites
 tests/            python3 -m unittest discover tests
 ```

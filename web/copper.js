@@ -200,7 +200,13 @@
       else zoom(4, e.clientX - r.left, e.clientY - r.top);
     });
 
-    const shown = () => !root.hidden && root.offsetParent !== null;
+    // keys work while the tab is open and on screen: a page the viewer is
+    // embedded in has other things to type at
+    const shown = () => {
+      if (root.hidden || root.offsetParent === null) return false;
+      const r = root.getBoundingClientRect();
+      return r.bottom > 0 && r.top < innerHeight;
+    };
     document.addEventListener('keydown', e => {
       if (!shown() || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.metaKey || e.ctrlKey) return;
       const n = parseInt(e.key, 10);

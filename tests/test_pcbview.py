@@ -20,7 +20,9 @@ from pcbview import config, sexp                       # noqa: E402
 from pcbview.board import arc_len                      # noqa: E402
 from pcbview.model3d import extent, rotated            # noqa: E402
 from pcbview.models import Resolver, rewrite_models    # noqa: E402
+from pcbview import site as pages                      # noqa: E402
 from pcbview.site import span                          # noqa: E402
+from pcbview.util import shown                         # noqa: E402
 
 DEMO = Path("/usr/share/kicad/demos/complex_hierarchy/complex_hierarchy.kicad_pcb")
 
@@ -124,6 +126,61 @@ class Pages(unittest.TestCase):
         self.assertEqual(span(["C1", "C2", "C3", "C7", "R1"]), "C1&ndash;C3, C7, R1")
         self.assertEqual(span(["U2", "U1"]), "U1, U2")
 
+    def test_shown(self):
+        home = Path.home()
+        self.assertEqual(shown(home / "p" / "hw" / "b.kicad_pcb", home / "p"), "hw/b.kicad_pcb")
+        self.assertEqual(shown(home / "q" / "b.kicad_pcb", home / "p"), "~/q/b.kicad_pcb")
+        self.assertEqual(shown("/usr/share/x", "/tmp"), "/usr/share/x")
+
+
+class Embed(unittest.TestCase):
+    """A board's viewer written into a page of the project's own."""
+    PAGE = ("<html><head><title>mine</title></head><body>\n<h1>Mine</h1>\n"
+            "<!-- pcbview:begin -->\nwhatever was here\n<!-- pcbview:end -->\n"
+            "<div data-pv-note=\"copper\">about the copper</div>\n</body></html>\n")
+
+    def setUp(self):
+        self.dir = Path(tempfile.mkdtemp())
+        (self.dir / "hw").mkdir()
+        (self.dir / "hw" / "b.kicad_pcb").write_text("(kicad_pcb)")
+        (self.dir / "page.html").write_text(self.PAGE)
+        (self.dir / "pcbview.toml").write_text(
+            'title = "t"\nout = "viewer"\n\n[[boards]]\nid = "b"\nname = "Board B"\n'
+            'pcb = "hw/b.kicad_pcb"\nembed = "page.html"\n'
+            '[boards.sheets.01_power]\ntitle = "Power"\ndesc = "the supplies"\n')
+        self.site = config.load(self.dir / "pcbview.toml")
+        self.board = self.site.boards[0]
+        self.built = {"when": "2026-09-28 12:00", "source": self.board.source}
+
+    def tearDown(self):
+        shutil.rmtree(self.dir)
+
+    def test_config(self):
+        self.assertEqual(self.board.embed, self.dir / "page.html")
+        self.assertEqual(self.board.sheets["01_power"], {"title": "Power", "desc": "the supplies"})
+        self.assertEqual(self.board.source["pcb"], "hw/b.kicad_pcb")      # not the machine's path
+
+    def test_written_between_the_markers(self):
+        pages.write_embed(self.site, self.board, self.built, {})
+        text = (self.dir / "page.html").read_text()
+        self.assertNotIn("whatever was here", text)
+        self.assertTrue(text.startswith("<html><head><title>mine</title></head><body>\n<h1>Mine</h1>\n"))
+        self.assertTrue(text.endswith('<div data-pv-note="copper">about the copper</div>\n</body></html>\n'))
+        block = text[text.index("<!-- pcbview:begin -->"):text.index("<!-- pcbview:end -->")]
+        for needle in ('<section class="vw" data-pv-embed', 'href="viewer/assets/viewer.css"',
+                       'src="viewer/assets/viewer.js"', 'data-dir="viewer/b/layers/"',
+                       'data-dir="viewer/b/3d/"', '"./viewer/assets/vendor/three.module.js"'):
+            self.assertIn(needle, block)
+        self.assertNotIn('id="schematic"', block)              # no schematic, no tab
+        self.assertNotIn(str(self.dir), block)
+        pages.write_embed(self.site, self.board, self.built, {})       # again: the same page
+        self.assertEqual((self.dir / "page.html").read_text(), text)
+
+    def test_no_markers_is_an_error(self):
+        (self.dir / "page.html").write_text("<html><body>nothing to write between</body></html>")
+        with self.assertRaises(SystemExit):
+            pages.write_embed(self.site, self.board, self.built, {})
+
 
 @unittest.skipUnless(shutil.which("kicad-cli") and DEMO.exists(), "needs kicad-cli and KiCad's demos")
 class EndToEnd(unittest.TestCase):
@@ -142,8 +199,8 @@ class EndToEnd(unittest.TestCase):
         html = (self.out / "index.html").read_text()
         for needle in ('data-tab="schematic"', 'data-tab="copper"', 'data-tab="board3d"', 'id="overview"'):
             self.assertIn(needle, html)
-        for asset in ("app.js", "parts.js", "copper.js", "sch.js", "board3d.js", "pcbview.css",
-                      "vendor/three.module.js"):
+        for asset in ("app.js", "viewer.js", "parts.js", "copper.js", "sch.js", "board3d.js",
+                      "viewer.css", "pcbview.css", "vendor/three.module.js"):
             self.assertTrue((self.out / "assets" / asset).exists(), asset)
 
     def test_sheets(self):

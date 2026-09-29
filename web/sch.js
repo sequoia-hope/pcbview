@@ -75,7 +75,10 @@
           });
           return b;
         }));
-        show(Math.max(0, wanted()));
+        // a hash's sheet, or the first that has parts on it: a top level
+        // that only holds sheet boxes is not much to open on
+        const first = Math.max(0, sheets.findIndex(s => s.symbols !== 0));
+        show(wanted() >= 0 ? wanted() : first);
       }).catch(e => {
         msg.hidden = false;
         msg.innerHTML = 'The schematic plots are missing: run <code>python3 -m pcbview build</code>. (' + e + ')';
@@ -112,13 +115,15 @@
     }));
     addEventListener('keydown', e => {
       if (!shown() || e.target.closest('input, textarea, select') || e.metaKey || e.ctrlKey) return;
+      const r = panel.getBoundingClientRect();                 // and on screen
+      if (r.bottom < 0 || r.top > innerHeight) return;
       if (e.key === '0') fitAll();
       else if (e.key === '+' || e.key === '=') zoomAt(1.5, plate.clientWidth / 2, plate.clientHeight / 2);
       else if (e.key === '-') zoomAt(1 / 1.5, plate.clientWidth / 2, plate.clientHeight / 2);
       else if (/^[1-9]$/.test(e.key) && sheets[+e.key - 1]) show(+e.key - 1);
     });
 
-    // app.js fires resize when a tab is chosen: the first time this one is,
+    // viewer.js fires resize when a tab is chosen: the first time this one is,
     // fetch the list and the first sheet
     addEventListener('resize', () => { load(); layout(); });
     new ResizeObserver(layout).observe(plate);
