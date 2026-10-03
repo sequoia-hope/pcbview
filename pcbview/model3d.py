@@ -62,7 +62,17 @@ MPN_FIELDS = ("MPN", "Manufacturer Part Number", "MFR.Part #", "Part Number", "P
 
 # ---------------------------------------------------------------- parts ----
 def props_of(fp):
-    return {sexp.unq(p[1]): sexp.unq(p[2]) for p in sexp.findall(fp, "property")}
+    """The footprint's fields. KiCad 8+ writes them as (property "Reference" "U1");
+    boards written by KiCad 7 and earlier -- and by generators that still speak
+    that dialect -- carry the reference and value as (fp_text reference "U1")
+    instead, which KiCad 9 reads without complaint. So do we: a board whose
+    every part is "?" has no part pane at all."""
+    props = {sexp.unq(p[1]): sexp.unq(p[2]) for p in sexp.findall(fp, "property")}
+    for t in sexp.findall(fp, "fp_text"):
+        kind = sexp.unq(t[1])
+        if kind in ("reference", "value"):
+            props.setdefault(kind.capitalize(), sexp.unq(t[2]))
+    return props
 
 
 def side_of(fp):
