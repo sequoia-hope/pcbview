@@ -14,7 +14,7 @@ turns a KiCad project into a static site (no server code, no build step for the 
   sheet's millimetre is ~40 px, and the PDF of the whole schematic.
 - **PCB** — every copper layer, plus silkscreen and fab overlays, plotted in KiCad's own
   coordinates so they stack in register. Pick a layer to bring it to the front, dim the rest,
-  mirror to look from the back, grid them side by side. The cursor reads out the x and y
+  mirror to look from the back, grid them side by side. Drag to pan, wheel or pinch to zoom. The cursor reads out the x and y
   pcbnew shows (and radius and angle on a round board). Click a part for the part pane.
 - **3D** — the board as `kicad-cli pcb export glb` makes it, merged and quantized from ~30 MB
   to ~8. Hover a part for its reference, click for the part pane, double-click or type a
@@ -207,7 +207,9 @@ pcbview/          the Python package
   site.py         the pages
   sexp.py         a KiCad s-expression reader (tolerates a stray paren, as KiCad does)
 web/              the front end, copied into every site: viewer.js runs the tabs, app.js
-                  the page round them (tree, breadcrumb), parts.js the part pane
+                  the page round them (tree, breadcrumb), parts.js the part pane,
+                  gesture.js the plates' drag / pinch / tap (the 3D tab's
+                  TrackballControls has its own)
 examples/         configs for the example sites
 tests/            python3 -m unittest discover tests
 ```

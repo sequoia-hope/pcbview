@@ -359,6 +359,7 @@ def scripts(assets):
     """The viewer's scripts, from `assets` (the path to the site's assets/,
     with its slash). app.js, where there is one, goes before viewer.js."""
     return f"""<script src="{assets}parts.js" defer></script>
+<script src="{assets}gesture.js" defer></script>
 <script src="{assets}viewer.js" defer></script>
 <script src="{assets}copper.js" defer></script>
 <script src="{assets}sch.js" defer></script>
