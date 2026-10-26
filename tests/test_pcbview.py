@@ -18,7 +18,7 @@ sys.path.insert(0, str(ROOT))
 
 from pcbview import config, sexp                       # noqa: E402
 from pcbview.board import arc_len                      # noqa: E402
-from pcbview.model3d import extent, rotated            # noqa: E402
+from pcbview.model3d import extent, read_glb, rewrite, rotated   # noqa: E402
 from pcbview.models import Resolver, rewrite_models    # noqa: E402
 from pcbview import site as pages                      # noqa: E402
 from pcbview.site import span                          # noqa: E402
@@ -118,7 +118,34 @@ class Models(unittest.TestCase):
         self.assertIn("(offset (xyz 0 0 0))", out)
         self.assertIn("(rotate (xyz 0 0 -90))", out)
         self.assertIn("(scale (xyz 1 1 1))", out)
-        self.assertEqual(seen["${EASY}/sub/thing.wrl"]["status"], "substituted")
+        self.assertEqual( rewrite_models(text, self.r)[1]["${EASY}/sub/thing.wrl"]["status"], "substituted")
+
+    def test_silkscreen_stays_opaque(self):
+        # KiCad's default theme exports silkscreen with alpha 0.9; only the
+        # solder mask should be alpha-blended, or three.js depth-sorts the
+        # mask over the silk when the board is tilted past perpendicular
+        import numpy as np
+        pos = np.array([[0, 0, 0], [1, 0, 0], [0, 0, 1]], dtype=np.float32).tobytes()
+        g = {
+            "asset": {"version": "2.0"}, "scene": 0, "scenes": [{"nodes": [0, 1]}],
+            "nodes": [{"name": "=>silk", "mesh": 0}, {"name": "=>mask", "mesh": 1}],
+            "meshes": [
+                {"name": "b_silkscreen", "primitives": [{"attributes": {"POSITION": 0}, "material": 0}]},
+                {"name": "b_soldermask", "primitives": [{"attributes": {"POSITION": 0}, "material": 1}]},
+            ],
+            "materials": [
+                {"pbrMetallicRoughness": {"baseColorFactor": [0.9, 0.9, 0.9, 0.9]}},
+                {"pbrMetallicRoughness": {"baseColorFactor": [0.1, 0.3, 0.1, 0.83]}},
+            ],
+            "accessors": [{"bufferView": 0, "componentType": 5126, "count": 3, "type": "VEC3"}],
+            "bufferViews": [{"buffer": 0, "byteOffset": 0, "byteLength": len(pos)}],
+        }
+        out, _, _ = rewrite(g, pos, "b", {})
+        silk, mask = out["materials"][0], out["materials"][1]
+        self.assertNotIn("alphaMode", silk)
+        self.assertEqual(silk["pbrMetallicRoughness"]["baseColorFactor"][3], 1.0)
+        self.assertEqual(mask.get("alphaMode"), "BLEND")
+        self.assertAlmostEqual(mask["pbrMetallicRoughness"]["baseColorFactor"][3], 0.83)
 
 
 class Pages(unittest.TestCase):

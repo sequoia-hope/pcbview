@@ -79,8 +79,12 @@
       row.querySelector('input[type=checkbox]').onchange = e => { state.vis[l.slug] = e.target.checked; draw(); };
     });
     const [bw0, bh0] = meta.size_mm;
+    const dimX = el('div', 'cu-dim cu-dim-x', `<span>${meta.round ? 'Ø' + meta.round.dia : bw0} mm</span>`);
+    const dimY = el('div', 'cu-dim cu-dim-y', `<span>${meta.round ? meta.round.dia : bh0} mm</span>`);
+    plate.append(dimX, dimY);
     $('#cu-stats').textContent =
-      (meta.round ? `Ø${meta.round.dia} mm` : `${bw0} × ${bh0} mm`) + ` · ${copper.length} copper layers · ` +
+      (meta.round ? `Ø${meta.round.dia} mm` : `${bw0} × ${bh0} mm`) +
+      (meta.thickness ? ` × ${meta.thickness} mm` : '') + ` · ${copper.length} copper layers · ` +
       `${meta.tracks.toLocaleString('en')} track segments, ${Math.round(meta.length_mm).toLocaleString('en')} mm · ` +
       `${meta.vias.toLocaleString('en')} vias · plotted ${meta.generated}`;
 
@@ -104,11 +108,12 @@
     });
 
     // ---- the board in the canvas: fitted, then panned and zoomed ----------------
+    const PAD = 30;                                   // room round the board for its dimension lines
     let fit = 1, bl = 0, bt = 0, bw = 0, bh = 0;
     function layout() {
       const W = plate.clientWidth, H = plate.clientHeight;
       if (!W || !H) return;
-      fit = Math.min(W / vw, H / vh);             // px per mm at 1x
+      fit = Math.min(Math.max(W - 2 * PAD, 40) / vw, Math.max(H - 2 * PAD, 40) / vh);   // px per mm at 1x
       bw = vw * fit; bh = vh * fit; bl = (W - bw) / 2; bt = (H - bh) / 2;
       Object.assign(flip.style, { left: bl + 'px', top: bt + 'px', width: bw + 'px', height: bh + 'px' });
       place();
@@ -131,6 +136,10 @@
       if (s === 1 && !drag) { state.tx = state.ty = 0; }
       pan.style.transform = `translate(${state.tx}px, ${state.ty}px) scale(${s})`;
       flip.style.transform = state.mirror ? 'scaleX(-1)' : '';
+      const x0 = state.tx + s * (bl + (vw - bw0) / 2 * fit), sw = s * bw0 * fit;
+      const y0 = state.ty + s * (bt + (vh - bh0) / 2 * fit), sh = s * bh0 * fit;
+      Object.assign(dimX.style, { left: x0 + 'px', top: (y0 - 22) + 'px', width: sw + 'px' });
+      Object.assign(dimY.style, { left: (x0 - 22) + 'px', top: y0 + 'px', height: sh + 'px' });
       $('#cu-zoom').textContent = s.toFixed(1) + '×';
       const mmpx = 1 / (fit * s);                   // the scale bar
       const nice = [0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50, 100].reduce((a, b) =>

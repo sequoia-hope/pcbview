@@ -70,10 +70,13 @@ function init(root) {
     scene.background = new THREE.Color(getComputedStyle(stage).backgroundColor);   // style.css's canvas
     const pmrem = new THREE.PMREMGenerator(renderer);
     scene.environment = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
+    scene.add(new THREE.AmbientLight(0xffffff, 1.6));
     camera = new THREE.PerspectiveCamera(30, 1, 1e-4, 10);
-    const head = new THREE.DirectionalLight(0xffffff, 0.7);    // rides with the eye
-    head.position.set(0.3, 0.6, 1);
-    camera.add(head);
+    for (const [x, y] of [[0.3, 0.5], [-0.3, -0.5]]) {         // rides with the eye, above and below
+      const head = new THREE.DirectionalLight(0xffffff, 0.6);
+      head.position.set(x, y, 1);
+      camera.add(head, head.target);
+    }
     scene.add(camera);
     controls = new TrackballControls(camera, renderer.domElement);
     Object.assign(controls, { rotateSpeed: 3.5, zoomSpeed: 1.3, panSpeed: 0.8,
@@ -101,6 +104,17 @@ function init(root) {
       if (x.layer) {
         (layers[x.layer] = layers[x.layer] || []).push(o);
         if (x.layer === 'PCB' || x.layer === 'soldermask') occluders.push(o);
+        if (x.layer === 'PCB' || x.layer === 'soldermask' || x.layer === 'silkscreen') {
+          o.traverse(m => {
+            if (!m.isMesh) return;
+            m.material.envMapIntensity = 0;
+            if (x.layer === 'silkscreen') {
+              m.material.transparent = false;
+              m.material.opacity = 1;
+              m.material.depthWrite = true;
+            }
+          });
+        }
       }
     });
     // centre on the laminate, not on everything: a connector may hang over the edge

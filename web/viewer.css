@@ -122,6 +122,23 @@ section.vw {
   position: absolute; z-index: 400; pointer-events: none; border: 2px solid #2f9bff;
   box-shadow: 0 0 0 1px rgba(0,0,0,.6), 0 0 12px rgba(47,155,255,.8); border-radius: 1px;
 }
+.cu-dim {
+  position: absolute; color: var(--cu-dim); font-size: .7rem; font-family: var(--mono);
+  pointer-events: none; display: grid; place-items: center;
+}
+.cu-dim::before { content: ""; position: absolute; }
+.cu-dim span {
+  position: relative; background: var(--plate); padding: 0 .35rem; line-height: 1.2; white-space: nowrap;
+}
+.cu-dim-x {
+  height: 12px; border-left: 1px solid var(--cu-dim); border-right: 1px solid var(--cu-dim);
+}
+.cu-dim-x::before { left: 0; right: 0; top: 50%; border-top: 1px solid var(--cu-dim); }
+.cu-dim-y {
+  width: 12px; border-top: 1px solid var(--cu-dim); border-bottom: 1px solid var(--cu-dim);
+}
+.cu-dim-y::before { top: 0; bottom: 0; left: 50%; border-left: 1px solid var(--cu-dim); }
+.cu-dim-y span { writing-mode: vertical-rl; transform: rotate(180deg); padding: .35rem 0; }
 .cu-scale { position: absolute; left: .7rem; bottom: .6rem; display: flex; align-items: center;
   gap: .4rem; color: var(--cu-dim); font-size: .7rem; font-family: var(--mono); pointer-events: none; }
 .cu-scale i { display: block; height: 5px; border: 1px solid var(--cu-dim); border-top: none; }

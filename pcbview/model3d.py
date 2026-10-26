@@ -483,15 +483,20 @@ def rewrite(g, blob, name, parts, boxes=()):
     shiny = {p.get("material") for m in meshes
              if m["name"][len(name) + 1:] in ("copper", "pad", "via") and m["name"].startswith(name + "_")
              for p in m["primitives"]}
+    mask = {p.get("material") for m in meshes
+            if m["name"] == name + "_soldermask" for p in m["primitives"]}
     for i, mat in enumerate(materials):
         pbr = mat.setdefault("pbrMetallicRoughness", {})
         pbr["metallicFactor"], pbr["roughnessFactor"] = (0.55, 0.35) if i in shiny else (0.0, 0.6)
         rgba = pbr.get("baseColorFactor", [1] * 4)
         if i in board_mats:
-            pbr["baseColorFactor"] = [round(linear(c), 6) for c in rgba[:3]] + rgba[3:]
-        if rgba[3] < 1:                     # the mask's alpha, which glTF ignores unless asked
+            alpha = rgba[3] if i in mask else 1.0
+            pbr["baseColorFactor"] = [round(linear(c), 6) for c in rgba[:3]] + [alpha]
+        if pbr.get("baseColorFactor", [1] * 4)[3] < 1:     # the mask's alpha, which glTF ignores unless asked
             mat["alphaMode"] = "BLEND"
             pbr["roughnessFactor"] = 0.3
+        else:
+            mat.pop("alphaMode", None)
 
     # the parts with no model, as boxes on their face of the board
     if boxes:
