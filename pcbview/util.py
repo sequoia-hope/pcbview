@@ -17,6 +17,15 @@ def sh(cmd, cwd=None, check=True):
     return r
 
 
+def version():
+    """The commit this code is from, as a site records it: a project pins its own
+    copy of pcbview, and a page that misbehaves should say which copy built it."""
+    from . import __version__
+    r = subprocess.run(["git", "-C", str(Path(__file__).parent), "describe", "--always", "--dirty"],
+                       capture_output=True, text=True)
+    return "%s (%s)" % (__version__, r.stdout.strip()) if r.returncode == 0 else __version__
+
+
 def need_kicad():
     if not shutil.which("kicad-cli"):
         sys.exit("kicad-cli is not on the PATH: pcbview drives KiCad 9's own exporters")

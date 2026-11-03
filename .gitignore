@@ -5,3 +5,4 @@ __pycache__/
 demo/
 # local dev launcher, not part of the project
 launch.sh
+.venv/

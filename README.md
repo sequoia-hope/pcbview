@@ -143,6 +143,29 @@ bin/pcbview build pcbview.toml --board rev-a    # some boards
 bin/pcbview build pcbview.toml --only 3d --parts-only   # the part pane's data, not the model
 bin/pcbview models pcbview.toml                 # where every 3D model resolves, and why not
 bin/pcbview quick board.kicad_pcb -o site/
+bin/pcbview refresh pcbview.toml                # new pages and viewer code, same plots and model
+bin/pcbview --version                           # the commit this copy is at
+```
+
+A site is a snapshot: `build` copies `web/` into `<site>/assets/`, so a fix to the viewer reaches a
+site only when it is built or refreshed, by a copy of pcbview that has the fix. Projects that use
+`~/Software/pcbview` get it on their next build. Projects made from boardroom pin pcbview at
+`vendor/pcbview` and need the pin moved first:
+
+```sh
+git -C vendor/pcbview pull origin main && git add vendor/pcbview && git commit -m "Bump pcbview"
+scripts/view.sh refresh pcbview.toml
+```
+
+Every page says which copy built it, in `<meta name="generator">`, as does `site.json`.
+
+## Tests
+
+```sh
+python3 -m unittest discover tests                          # what can run here; the rest say why they skip
+python3 -m venv --system-site-packages .venv                # once, for the browser tests
+.venv/bin/pip install -r requirements-dev.txt && .venv/bin/playwright install chromium
+.venv/bin/python -m unittest discover tests                 # everything, the 3D tab in headless Chromium
 ```
 
 ## What comes out
@@ -211,5 +234,5 @@ web/              the front end, copied into every site: viewer.js runs the tabs
                   gesture.js the plates' drag / pinch / tap (the 3D tab's
                   TrackballControls has its own)
 examples/         configs for the example sites
-tests/            python3 -m unittest discover tests
+tests/            see Tests
 ```

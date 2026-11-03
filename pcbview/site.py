@@ -24,7 +24,7 @@ import sys
 from datetime import date, datetime
 from pathlib import Path
 
-from .util import esc, natural, shown
+from .util import esc, natural, shown, version
 
 WEB = Path(__file__).resolve().parent.parent / "web"
 
@@ -373,6 +373,7 @@ def board_page(site, board, built, sheets):
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="generator" content="pcbview {esc(version())}">
 <title>{esc(site.title)} &mdash; {esc(board.name)}</title>
 <link rel="stylesheet" href="assets/viewer.css">
 <link rel="stylesheet" href="assets/pcbview.css">
@@ -445,6 +446,7 @@ def list_page(site, built):
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="generator" content="pcbview {esc(version())}">
 <title>{esc(site.title)}</title>
 <link rel="stylesheet" href="assets/viewer.css">
 <link rel="stylesheet" href="assets/pcbview.css">
@@ -482,6 +484,7 @@ def write(site, built):
     if len(site.boards) > 1:
         (out / "index.html").write_text(list_page(site, built))
     info = {"title": site.title, "built": datetime.now().isoformat(timespec="seconds"),
+            "pcbview": version(),
             "config": shown(site.config, site.base) if site.config else None,
             "boards": [{"id": b.id, "name": b.name, "page": page_name(site, b),
                         "embed": shown(b.embed, site.base) if b.embed else None,

@@ -1,0 +1,3 @@
+# for tests/test_browser.py
+playwright>=1.63
+pillow

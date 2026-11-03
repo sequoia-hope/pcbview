@@ -3,7 +3,9 @@
     python3 -m pcbview build pcbview.toml            # every board, every tab
     python3 -m pcbview build pcbview.toml --only 3d --board rev-a
     python3 -m pcbview quick board.kicad_pcb -o site/   # no config file
+    python3 -m pcbview refresh pcbview.toml          # new pages and viewer code, same plots and model
     python3 -m pcbview models pcbview.toml           # where each 3D model resolves
+    python3 -m pcbview --version                     # the commit this copy is at
 """
 import argparse
 import json
@@ -15,7 +17,7 @@ from pathlib import Path
 from . import config, layers, model3d, schematic, site as pages
 from .board import Board
 from .models import Resolver
-from .util import natural
+from .util import natural, version
 
 STAGES = ("sch", "layers", "3d")
 
@@ -50,7 +52,20 @@ def build(site, only=None, boards=None, parts_only=False):
         built[b.id] = rec
         print(f"  done in {time.time() - t:.0f} s")
     pages.write(site, built)
-    print(f"site: {site.out / 'index.html'}")
+    print(f"site: {site.out / 'index.html'} (pcbview {version()})")
+
+
+def refresh(site):
+    """Rewrite the pages and the viewer's code around what was already built, so
+    a fix to the viewer reaches a site without KiCad, or a wait for it."""
+    built = {}
+    for b in site.boards:
+        rec = site.out / b.id / "built.json"
+        if not rec.exists():
+            sys.exit(f"board {b.id} has not been built: run build first")
+        built[b.id] = json.loads(rec.read_text())
+    pages.write(site, built)
+    print(f"site: {site.out / 'index.html'} (pcbview {version()})")
 
 
 def models_report(target, board_ids=None):
@@ -87,6 +102,7 @@ def models_report(target, board_ids=None):
 def main():
     ap = argparse.ArgumentParser(prog="pcbview", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--version", action="version", version=version())
     sub = ap.add_subparsers(dest="cmd", required=True)
     b = sub.add_parser("build", help="build the site a pcbview.toml describes")
     b.add_argument("config")
@@ -99,6 +115,8 @@ def main():
     q.add_argument("--sch")
     q.add_argument("-o", "--out")
     q.add_argument("--title")
+    r = sub.add_parser("refresh", help="new pages and viewer code around what is already built")
+    r.add_argument("config")
     m = sub.add_parser("models", help="where each footprint's 3D model resolves")
     m.add_argument("target", help="a .kicad_pcb, or a pcbview.toml (its boards and stand-ins)")
     m.add_argument("--board", help="comma-separated board ids, with a pcbview.toml")
@@ -112,6 +130,8 @@ def main():
         build(site, only, a.board.split(",") if a.board else None, a.parts_only)
     elif a.cmd == "quick":
         build(config.quick(a.pcb, a.sch, a.out, a.title))
+    elif a.cmd == "refresh":
+        refresh(config.load(a.config))
     elif a.cmd == "models":
         models_report(a.target, a.board.split(",") if a.board else None)
 

@@ -104,17 +104,17 @@ function init(root) {
       if (x.layer) {
         (layers[x.layer] = layers[x.layer] || []).push(o);
         if (x.layer === 'PCB' || x.layer === 'soldermask') occluders.push(o);
-        if (x.layer === 'PCB' || x.layer === 'soldermask' || x.layer === 'silkscreen') {
-          o.traverse(m => {
-            if (!m.isMesh) return;
-            m.material.envMapIntensity = 0;
-            if (x.layer === 'silkscreen') {
-              m.material.transparent = false;
-              m.material.opacity = 1;
-              m.material.depthWrite = true;
-            }
-          });
-        }
+        o.traverse(m => {
+          if (!m.isMesh) return;
+          if (x.layer === 'PCB' || x.layer === 'soldermask' || x.layer === 'silkscreen') m.material.envMapIntensity = 0;
+          // three.js draws translucent meshes farthest origin first, and the
+          // origins of a board's sheets and its parts swap places near face-on.
+          // Whatever comes after the mask is veiled by it, and would pop as they
+          // swap: so the mask goes first, and the silk (a board built before
+          // model3d.py made it opaque has it at alpha 0.9) is not translucent.
+          if (x.layer === 'soldermask') m.renderOrder = -1;
+          if (x.layer === 'silkscreen') Object.assign(m.material, { transparent: false, opacity: 1, depthWrite: true });
+        });
       }
     });
     // centre on the laminate, not on everything: a connector may hang over the edge
@@ -124,6 +124,20 @@ function init(root) {
     scene.add(board);
     const size = pcb.getSize(new THREE.Vector3());
     board.userData.radius = Math.max(size.x, size.z) / 2;
+    // the console's and the browser tests' way in: look along a direction at
+    // once, and draw a frame to read back (the buffer is gone after the next task)
+    root.pv3d = {
+      scene, layers, parts,
+      look(dir, up) {
+        fly(new THREE.Vector3(...dir).normalize(), new THREE.Vector3(...up), new THREE.Vector3(),
+            fitDistance(board.userData.radius), true);
+      },
+      frame() {
+        clip();
+        renderer.render(scene, camera);
+        return renderer.domElement.toDataURL('image/png');
+      },
+    };
     view('tilt', true);
     toggles();
     finder();

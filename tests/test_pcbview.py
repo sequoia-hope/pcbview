@@ -22,7 +22,7 @@ from pcbview.model3d import extent, read_glb, rewrite, rotated   # noqa: E402
 from pcbview.models import Resolver, rewrite_models    # noqa: E402
 from pcbview import site as pages                      # noqa: E402
 from pcbview.site import span                          # noqa: E402
-from pcbview.util import shown                         # noqa: E402
+from pcbview.util import shown, version                         # noqa: E402
 
 DEMO = Path("/usr/share/kicad/demos/complex_hierarchy/complex_hierarchy.kicad_pcb")
 
@@ -231,6 +231,24 @@ class EndToEnd(unittest.TestCase):
             self.assertTrue((self.out / "assets" / asset).exists(), asset)
         # the plates' gestures load before the plates
         self.assertLess(html.index("gesture.js"), html.index("copper.js"))
+
+    def test_says_which_pcbview_built_it(self):
+        self.assertIn(f'<meta name="generator" content="pcbview {version()}">', (self.out / "index.html").read_text())
+        self.assertEqual(json.loads((self.out / "site.json").read_text())["pcbview"], version())
+
+    def test_refresh_brings_new_viewer_code_and_keeps_the_model(self):
+        from pcbview.__main__ import refresh
+        code, glb = self.out / "assets" / "board3d.js", self.board / "3d" / "board.glb"
+        code.write_text("// an old viewer")
+        before = glb.stat().st_mtime_ns
+        refresh(config.quick(DEMO, out=self.out, title="complex"))
+        self.assertEqual(code.read_text(), (ROOT / "web" / "board3d.js").read_text())
+        self.assertEqual(glb.stat().st_mtime_ns, before)
+
+    def test_refresh_refuses_a_board_not_built(self):
+        from pcbview.__main__ import refresh
+        with tempfile.TemporaryDirectory() as empty, self.assertRaises(SystemExit):
+            refresh(config.quick(DEMO, out=Path(empty), title="never built"))
 
     def test_sheets(self):
         sheets = json.loads((self.board / "sch" / "sheets.json").read_text())["sheets"]
