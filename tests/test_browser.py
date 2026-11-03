@@ -47,9 +47,15 @@ def look_past_face(ny, azimuth, tilt):
     return [cos(a) * sin(t), ny * cos(t), sin(a) * sin(t)], [0, 0, -1]
 
 
-@unittest.skipUnless(has_browser() and shutil.which("kicad-cli") and DEMO.exists(),
-                     "needs Playwright, Pillow, kicad-cli and KiCad's demos")
-class Turning(unittest.TestCase):
+def to_array(url):
+    import numpy as np
+    from PIL import Image
+    png = base64.b64decode(url.split(",", 1)[1])
+    return np.asarray(Image.open(io.BytesIO(png)).convert("RGB")).astype(int)
+
+
+class Viewer(unittest.TestCase):
+    """The demo's site, open on its 3D tab in a headless browser."""
     @classmethod
     def setUpClass(cls):
         from playwright.sync_api import sync_playwright
@@ -96,10 +102,12 @@ class Turning(unittest.TestCase):
         kind = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
         route.fulfill(status=200, content_type=kind, body=path.read_bytes())
 
+
+@unittest.skipUnless(has_browser() and shutil.which("kicad-cli") and DEMO.exists(),
+                     "needs Playwright, Pillow, kicad-cli and KiCad's demos")
+class Turning(Viewer):
     def share(self, which, eye, up):
         """How much the objects `which` picks add to the picture from here, per pixel."""
-        import numpy as np
-        from PIL import Image
         urls = self.page.evaluate("""([which, eye, up]) => {
             const v = document.getElementById('board3d').pv3d, objs = eval(which)(v);
             v.look(eye, up);
@@ -109,8 +117,7 @@ class Turning(unittest.TestCase):
             objs.forEach(o => { o.visible = true; });
             return [shown, hidden];
         }""", [which, eye, up])
-        a, b = (np.asarray(Image.open(io.BytesIO(base64.b64decode(u.split(",", 1)[1]))).convert("RGB")).astype(int)
-                for u in urls)
+        a, b = map(to_array, urls)
         return float(abs(a - b).mean())
 
     def assert_no_pop(self, which, what):
@@ -153,6 +160,109 @@ class Turning(unittest.TestCase):
 
     def test_no_page_errors(self):
         self.assertEqual(self.errors, [])
+
+
+@unittest.skipUnless(has_browser() and shutil.which("kicad-cli") and DEMO.exists(),
+                     "needs Playwright, Pillow, kicad-cli and KiCad's demos")
+class Framing(Viewer):
+    """The board comes up whole, and the wheel does nothing but zoom."""
+
+    def setUp(self):
+        self.page.set_viewport_size({"width": 1000, "height": 700})
+        self.page.reload()
+        self.page.wait_for_function("document.getElementById('board3d').pv3d", timeout=120_000)
+        self.page.wait_for_timeout(300)
+
+    def picture(self):
+        """The frame as an array, once the view has stopped moving."""
+        self.page.wait_for_timeout(600)
+        url = self.page.evaluate("document.getElementById('board3d').pv3d.frame()")
+        return to_array(url)
+
+    def assert_whole_and_filling(self, what):
+        import numpy as np
+        im = self.picture()
+        off = abs(im - im[0, 0]).max(axis=2) > 8          # anything but the background
+        edge = off[0].sum() + off[-1].sum() + off[:, 0].sum() + off[:, -1].sum()
+        self.assertEqual(int(edge), 0, f"{what}: the board runs off the picture")
+        h, w = off.shape
+        span = max(np.ptp(np.nonzero(off.any(axis=0))) / w, np.ptp(np.nonzero(off.any(axis=1))) / h)
+        # not all of it: the view is centred on the laminate, and a connector may hang off one side
+        self.assertGreater(span, 0.7, f"{what}: the board is small in the picture")
+
+    def test_loads_whole_at_any_shape(self):
+        for w, h in ((1000, 700), (1600, 600), (700, 900), (420, 800)):
+            with self.subTest(width=w, height=h):
+                self.page.set_viewport_size({"width": w, "height": h})
+                self.assert_whole_and_filling(f"{w}x{h}")
+
+    def test_every_view_button_fits(self):
+        for name in ("front", "back", "tilt", "edge"):
+            with self.subTest(view=name):
+                self.page.locator(f'#board3d [data-view="{name}"]').click()
+                self.assert_whole_and_filling(name)
+
+    def camera(self):
+        return self.page.evaluate("""() => {
+            const v = document.getElementById('board3d').pv3d, c = v.camera, t = v.controls.target;
+            return { d: c.position.distanceTo(t), t: t.toArray(), q: c.quaternion.toArray() };
+        }""")
+
+    def over_the_stage(self):
+        box = self.page.locator("#b3-stage").bounding_box()
+        return box["x"] + box["width"] * 0.7, box["y"] + box["height"] * 0.6      # not its centre
+
+    def wheel(self, notches, dy):
+        self.page.mouse.move(*self.over_the_stage())
+        for _ in range(notches):
+            self.page.mouse.wheel(0, dy)
+            self.page.wait_for_timeout(40)
+        self.page.wait_for_timeout(150)
+
+    def test_zooming_only_zooms(self):
+        was = self.camera()
+        for dy in (120, -120):
+            self.wheel(4, dy)
+            now = self.camera()
+            self.assertEqual(now["t"], was["t"], "the wheel moved the point turned round")
+            for a, b in zip(now["q"], was["q"]):
+                self.assertAlmostEqual(a, b, places=5, msg="the wheel turned the view")
+
+    def test_a_notch_is_a_gentle_step_and_stops_at_once(self):
+        was = self.camera()["d"]
+        self.wheel(1, 120)
+        now = self.camera()["d"]
+        self.assertTrue(1.05 < now / was < 1.3, f"one notch took {was} to {now}")
+        self.page.wait_for_timeout(300)
+        self.assertEqual(self.camera()["d"], now, "still zooming after the wheel stopped")
+
+    def test_zooming_out_stops_with_the_board_in_sight(self):
+        self.wheel(60, 120)
+        big = self.camera()["d"]
+        self.wheel(10, 120)
+        self.assertEqual(self.camera()["d"], big, "no limit to zooming out")
+        off = abs((im := self.picture()) - im[0, 0]).max(axis=2) > 8
+        self.assertGreater(int(off.sum()), 400, "zoomed out until the board is gone")
+
+    def test_a_drag_stops_when_the_hand_does(self):
+        x, y = self.over_the_stage()
+        self.page.mouse.move(x, y)
+        self.page.mouse.down()
+        self.page.mouse.move(x + 120, y + 30, steps=4)
+        self.page.mouse.up()
+        self.page.wait_for_timeout(100)
+        was = self.camera()["q"]
+        self.page.wait_for_timeout(400)
+        self.assertEqual(self.camera()["q"], was, "the board kept turning after the drag")
+
+    def test_a_small_move_up_close_is_drawn(self):
+        # the controls report a move only past a millimetre, and a board is in metres
+        self.wheel(16, -120)
+        stage = self.page.locator("#b3-stage")
+        self.page.wait_for_timeout(200)
+        before = stage.screenshot()
+        self.wheel(1, -120)
+        self.assertNotEqual(stage.screenshot(), before, "the camera moved and nothing was drawn")
 
 
 if __name__ == "__main__":

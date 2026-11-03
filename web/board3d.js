@@ -53,6 +53,8 @@ function init(root) {
   }, { rootMargin: '300px' }).observe(stage);
 
   let renderer, scene, camera, controls, board, tween = null, dirty = true;
+  let framed = null;                           // the view button in force, until the user moves
+  const drawn = { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() };
   const parts = new Map(), layers = {}, occluders = [];
   let hover = null, chosen = null, pendingRef = null;
 
@@ -79,10 +81,9 @@ function init(root) {
     }
     scene.add(camera);
     controls = new TrackballControls(camera, renderer.domElement);
-    Object.assign(controls, { rotateSpeed: 3.5, zoomSpeed: 1.3, panSpeed: 0.8,
-                              dynamicDampingFactor: 0.14 });
-    controls.addEventListener('start', () => { tween = null; });
-    controls.addEventListener('change', () => { dirty = true; });
+    // no coasting: the board moves while the hand does, and a wheel notch is one step
+    Object.assign(controls, { rotateSpeed: 3.5, zoomSpeed: 5, panSpeed: 0.8, staticMoving: true });
+    controls.addEventListener('start', () => { tween = null; framed = null; });
     new ResizeObserver(resize).observe(stage);
     resize();
     wire();
@@ -124,10 +125,13 @@ function init(root) {
     scene.add(board);
     const size = pcb.getSize(new THREE.Vector3());
     board.userData.radius = Math.max(size.x, size.z) / 2;
+    board.userData.outline = outline();
+    controls.minDistance = 0.002;
+    controls.maxDistance = 4 * Math.max(...Object.keys(VIEWS).map(v => frameDistance(...VIEWS[v])));
     // the console's and the browser tests' way in: look along a direction at
     // once, and draw a frame to read back (the buffer is gone after the next task)
     root.pv3d = {
-      scene, layers, parts,
+      scene, camera, controls, layers, parts,
       look(dir, up) {
         fly(new THREE.Vector3(...dir).normalize(), new THREE.Vector3(...up), new THREE.Vector3(),
             fitDistance(board.userData.radius), true);
@@ -152,12 +156,42 @@ function init(root) {
     return 1.08 * r / Math.sin(Math.min(fov, Math.atan(Math.tan(fov) * camera.aspect)));
   }
 
+  // where the board reaches: the laminate's every vertex (a round board has no
+  // corners to go by) and the box of every part, as one may hang over the edge
+  function outline() {
+    board.updateWorldMatrix(true, true);
+    const pts = [], v = new THREE.Vector3();
+    layers.PCB?.[0].traverse(m => {
+      const at = m.isMesh && m.geometry.attributes.position;
+      for (let i = 0; at && i < at.count; i++) pts.push(v.fromBufferAttribute(at, i).applyMatrix4(m.matrixWorld).clone());
+    });
+    for (const p of parts.values()) {
+      const box = new THREE.Box3().setFromObject(p);
+      if (box.isEmpty()) continue;
+      for (const x of [box.min.x, box.max.x]) for (const y of [box.min.y, box.max.y]) for (const z of [box.min.z, box.max.z])
+        pts.push(new THREE.Vector3(x, y, z));
+    }
+    return pts;
+  }
+
+  // how far off along `dir`, looking at the centre, for all of it to be in the
+  // picture with a margin: a point nearer the eye looks farther out, so each one
+  // asks for its own distance, and the farthest of those is the answer
+  function frameDistance(dir, up) {
+    const side = new THREE.Vector3(...up).cross(new THREE.Vector3(...dir)).normalize();
+    const back = new THREE.Vector3(...dir).normalize();
+    const top = back.clone().cross(side);
+    const tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2), tanH = tanV * camera.aspect;
+    let d = 0;
+    for (const p of board.userData.outline)
+      d = Math.max(d, p.dot(back) + 1.05 * Math.max(Math.abs(p.dot(side)) / tanH, Math.abs(p.dot(top)) / tanV));
+    return d;
+  }
+
   function view(name, now) {
     const [d, u] = VIEWS[name];
-    const r = board.userData.radius;
-    // tilted, the disc foreshortens; edge on, it is a strip: fit what shows
-    const dist = fitDistance(r * ({ tilt: 0.85, edge: 0.75 }[name] || 1));
-    fly(new THREE.Vector3(...d).normalize(), new THREE.Vector3(...u), new THREE.Vector3(), dist, now);
+    fly(new THREE.Vector3(...d).normalize(), new THREE.Vector3(...u), new THREE.Vector3(), frameDistance(d, u), now);
+    framed = name;
     root.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === name));
     return name;
   }
@@ -168,7 +202,6 @@ function init(root) {
     eye.up.copy(up);
     eye.lookAt(target);
     const to = { q: eye.quaternion.clone(), t: target.clone(), d: dist };
-    still();
     if (now) { place(to.q, to.t, to.d); redraw(); return; }
     tween = { from: { q: camera.quaternion.clone(), t: controls.target.clone(),
                       d: camera.position.distanceTo(controls.target) },
@@ -182,15 +215,6 @@ function init(root) {
     camera.position.set(0, 0, d).applyQuaternion(q).add(t);
     controls.target.copy(t);
     camera.lookAt(t);
-  }
-
-  // TrackballControls keeps turning after a flick, and has no way to stop it
-  // but a damping of 1 for one update
-  function still() {
-    const d = controls.dynamicDampingFactor;
-    controls.dynamicDampingFactor = 1;
-    controls.update();
-    controls.dynamicDampingFactor = d;
   }
 
   function step(now) {
@@ -217,8 +241,12 @@ function init(root) {
     if (!visible) { running = false; return; }
     if (step(now)) dirty = true;
     else controls.update();
-    if (dirty) {
+    // ask the camera, not the controls: they report a move only past a millimetre,
+    // and a board is measured in metres, so up close it would move and not be drawn
+    if (dirty || !camera.position.equals(drawn.position) || !camera.quaternion.equals(drawn.quaternion)) {
       dirty = false;
+      drawn.position.copy(camera.position);
+      drawn.quaternion.copy(camera.quaternion);
       clip();
       renderer.render(scene, camera);
       placeTag();
@@ -243,6 +271,7 @@ function init(root) {
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     controls.handleResize();
+    if (framed && !tween) view(framed, true);    // still as the button left it: keep it whole
     redraw();
   }
 
@@ -315,6 +344,7 @@ function init(root) {
       up.set(0, 1, 0);
     }
     const size = box.getSize(new THREE.Vector3()).length();
+    framed = null;
     fly(dir, up, c, Math.max(fitDistance(size * 1.6), 0.012));
     root.querySelectorAll('[data-view]').forEach(b => b.classList.remove('on'));
   }
