@@ -188,12 +188,13 @@ def copper_panel(board, data):
           <button data-act="out" title="zoom out">&minus;</button>
           <button data-act="fit" title="fit the board">fit</button>
           <button data-act="in" title="zoom in">+</button>
+          <button data-act="real" title="life size: a millimetre on the board is a millimetre on this screen (click again to set the screen up)">1:1</button>
           <span class="sub" id="cu-zoom">1.0&times;</span>
         </div>
         <p class="cu-note" id="cu-note"></p>
         <p class="cu-read" id="cu-read"></p>
         <p class="cu-hint">Keys: <b>1</b>&ndash;<b>9</b> pick a layer, <b>s</b> solo,
-        <b>a</b> all, <b>m</b> mirror, <b>0</b> fit. Click a part for its pane;
+        <b>a</b> all, <b>m</b> mirror, <b>0</b> fit, <b>l</b> life size. Click a part for its pane;
         coordinates are pcbnew&rsquo;s, in millimetres.</p>
         <p class="cu-hint" id="cu-stats"></p>
       </div>
@@ -360,6 +361,7 @@ def scripts(assets):
     with its slash). app.js, where there is one, goes before viewer.js."""
     return f"""<script src="{assets}parts.js" defer></script>
 <script src="{assets}gesture.js" defer></script>
+<script src="{assets}scale.js" defer></script>
 <script src="{assets}viewer.js" defer></script>
 <script src="{assets}copper.js" defer></script>
 <script src="{assets}sch.js" defer></script>

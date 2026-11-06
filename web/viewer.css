@@ -258,6 +258,26 @@ table.b3-pins td:first-child { color: var(--muted); width: 3.2rem; padding-left:
 .pv-facts dt { color: var(--head); font-weight: 600; }
 .pv-facts dd small { display: block; color: var(--muted); font-size: .8rem; margin-top: .1rem; }
 
+/* ---- life size: the screen's setup (scale.js) ---- */
+.vw .pv-scale {
+  width: min(36rem, calc(100vw - 2rem)); max-height: calc(100dvh - 2rem); overflow: auto;
+  background: var(--card); color: var(--fg); border: 1px solid var(--edge); border-radius: 4px;
+  padding: 1rem 1.2rem; font-size: .85rem; line-height: 1.5;
+}
+.vw .pv-scale::backdrop { background: rgba(0,0,0,.6); }
+.pv-scale h3 { margin: 0 0 .2rem; color: var(--head); font-size: 1rem; }
+.pv-scale p { margin: .5rem 0; }
+.pv-scale input[type=range] { width: 100%; }
+.pv-scale input[type=number] { width: 5rem; font: inherit; background: var(--well); color: var(--fg);
+  border: 1px solid var(--line); border-radius: 3px; padding: .1rem .3rem; }
+.pv-card-box { display: grid; place-items: center; padding: .4rem 0; overflow: hidden; }
+.pv-card-out { display: grid; place-items: center; border: 2px solid var(--accent-hi); border-radius: 3mm;
+  color: var(--muted); font-family: var(--mono); font-size: .75rem; max-width: none; flex: none; }
+.pv-scale button { font: inherit; font-size: .78rem; font-weight: 500; color: #fff; background: var(--btn);
+  border: 0; border-radius: 3px; padding: .3rem .8rem; cursor: pointer; line-height: 1.5; }
+.pv-scale button:hover { background: var(--btn-hi); }
+.pv-scale button.on { background: var(--accent); }
+
 /* ================================================================== narrow == */
 @media (max-width: 760px) {
   section.vw, .vw[data-pv-embed] { height: auto; min-height: 0; }

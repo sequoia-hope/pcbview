@@ -226,11 +226,12 @@ class EndToEnd(unittest.TestCase):
         html = (self.out / "index.html").read_text()
         for needle in ('data-tab="schematic"', 'data-tab="copper"', 'data-tab="board3d"', 'id="overview"'):
             self.assertIn(needle, html)
-        for asset in ("app.js", "viewer.js", "parts.js", "gesture.js", "copper.js", "sch.js", "board3d.js",
+        for asset in ("app.js", "viewer.js", "parts.js", "gesture.js", "scale.js", "copper.js", "sch.js", "board3d.js",
                       "viewer.css", "pcbview.css", "vendor/three.module.js"):
             self.assertTrue((self.out / "assets" / asset).exists(), asset)
         # the plates' gestures load before the plates
         self.assertLess(html.index("gesture.js"), html.index("copper.js"))
+        self.assertLess(html.index("scale.js"), html.index("copper.js"))
 
     def test_says_which_pcbview_built_it(self):
         self.assertIn(f'<meta name="generator" content="pcbview {version()}">', (self.out / "index.html").read_text())
